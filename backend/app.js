@@ -1,0 +1,42 @@
+'use strict';
+const $=id=>document.getElementById(id);
+let csrf='',session=null,revision=null,state=null,busy=false;
+const drafts=new Map();
+function node(tag,text){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;}
+function message(text){$('message').textContent=text;}
+function setBusy(value){busy=value;document.querySelectorAll('button').forEach(b=>b.disabled=value||(!session&&b.id!=='create')||(b.id==='evaluate'&&drafts.size>0));document.querySelectorAll('input,select,textarea').forEach(e=>e.disabled=value);}
+function invalidate(){ $('proposal').textContent='Inputs changed. Compare again to create a current proposal.';$('evidence').textContent='Previous result cleared.';}
+async function tool(action,args={}){
+  const response=await fetch('/api/tool',{method:'POST',headers:{'Content-Type':'application/json','X-TasteBridge-Token':csrf},body:JSON.stringify({action,arguments:{session_id:session,revision,...args}})});
+  const body=await response.json();if(!response.ok)throw new Error(body.hint||body.error);return body;
+}
+async function perform(fn){if(busy)return;setBusy(true);try{await fn();}catch(e){message(e.message);invalidate();}finally{setBusy(false);}}
+function render(s){state=s;revision=s.revision;invalidate();const old=$('guest').value;$('guest').replaceChildren();for(const p of Object.keys(s.participants)){$('guest').append(new Option(p,p));}if(s.participants[old])$('guest').value=old;
+  $('current').replaceChildren();for(const [p,seeds] of Object.entries(s.participants)){const row=node('div');row.append(node('p',p+': '+(seeds.map(x=>x.name).join(', ')||'interests pending')));for(const seed of seeds){const remove=node('button','Remove '+seed.name);remove.className='secondary';remove.onclick=()=>perform(async()=>{render(await tool('remove_entity',{participant:p,entity_id:seed.entity_id}));message('Interest removed; previous proposal cleared.');});row.append(remove);}$('current').append(row);}
+  $('current').append(node('p',Object.keys(s.candidates).length+' reviewed places · €'+s.budget+' per guest'));
+  $('facts').replaceChildren();for(const [id,c] of Object.entries(s.candidates)){
+    const box=node('div');box.className='choice';box.append(node('h3',c.name));
+    const price=node('input');price.type='number';price.min='0';price.max='10000';price.value=c.cost_per_person??'';
+    const access=node('select');[['','Unknown'],['true','Confirmed step-free'],['false','Not step-free']].forEach(([v,t])=>access.append(new Option(t,v)));access.value=c.facts.step_free===true?'true':c.facts.step_free===false?'false':'';
+    const source=node('input');source.maxLength=400;source.placeholder='Public source or explicit host confirmation';source.value=c.source_note;
+    const observed=node('input');observed.type='datetime-local';observed.title='When these facts were actually checked';
+    if(c.observed_at){const d=new Date(c.observed_at);observed.value=new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+    for(const [title,input] of [['Price per guest (€)',price],['Step-free access',access],['Source or host confirmation',source],['Actual observation time (your local time)',observed]]){const label=node('label',title);label.append(input);box.append(label);}
+    const vetoes=[];box.append(node('p','Explicit guest vetoes (optional):'));for(const p of Object.keys(s.participants)){const label=node('label',p);const check=node('input');check.type='checkbox';check.checked=c.vetoes.includes(p);label.prepend(check);box.append(label);vetoes.push([p,check]);}
+    const draft=drafts.get(id);if(draft){price.value=draft.price;access.value=draft.access;source.value=draft.source;observed.value=draft.observed;vetoes.forEach(([p,e])=>e.checked=draft.vetoes.includes(p));}
+    const changed=()=>{drafts.set(id,{price:price.value,access:access.value,source:source.value,observed:observed.value,vetoes:vetoes.filter(x=>x[1].checked).map(x=>x[0])});invalidate();message('Save or discard edited facts before comparing.');setBusy(busy);};[price,access,source,observed,...vetoes.map(x=>x[1])].forEach(e=>e.addEventListener('input',changed));
+    const button=node('button','Save reviewed facts');button.onclick=()=>perform(async()=>{if(price.value===''||!observed.value)throw new Error('Enter price and the actual observation time.');const result=await tool('candidate_facts',{entity_id:id,cost_per_person:Number(price.value),facts:{step_free:access.value===''?null:access.value==='true'},vetoes:vetoes.filter(x=>x[1].checked).map(x=>x[0]),source_note:source.value,observed_at:new Date(observed.value).toISOString(),reviewed:true});drafts.delete(id);render(result);message('Facts recorded as user reported. Qloo does not verify them.');});box.append(button);const discard=node('button','Discard edits');discard.className='secondary';discard.onclick=()=>{drafts.delete(id);render(state);setBusy(false);message('Unsaved edits discarded.');};box.append(discard);const remove=node('button','Remove place');remove.className='secondary';remove.onclick=()=>perform(async()=>{const next=await tool('remove_entity',{entity_id:id});drafts.delete(id);render(next);message('Place removed; previous proposal cleared.');});box.append(remove);$('facts').append(box);
+  }
+  if(!Object.keys(s.candidates).length)$('facts').textContent='Reviewed places will appear here.';
+}
+async function search(role){const participant=$('guest').value;const result=await tool('search',{role,query:$(role==='seed'?'seedQuery':'placeQuery').value,entity_type:$('kind').value});const target=$(role==='seed'?'seedMatches':'placeMatches');target.replaceChildren();
+  if(result.status!=='needs_entity_review'){message('Search stopped: '+(result.reason||result.status)+'. No sample results have been substituted.');return;}
+  for(const match of result.matches){const row=node('div');row.className='choice';row.append(node('p',match.name));row.append(node('small',match.entity_id));const b=node('button',role==='seed'?'Confirm for '+participant:'Confirm this place');b.onclick=()=>perform(async()=>{const s=await tool('confirm_entity',{search_id:result.search_id,entity_id:match.entity_id,participant,reviewed:true});render(s);target.replaceChildren();message('Entity review recorded.');});row.append(b);target.append(row);}message('Check the returned identities before confirming.');
+}
+$('create').onclick=()=>perform(async()=>{const s=await tool('create',{participants:Number($('guests').value),budget:Number($('budget').value),required_facts:$('access').checked?['step_free']:[]});session=s.session_id;drafts.clear();render(s);$('seedMatches').replaceChildren();$('placeMatches').replaceChildren();message('Group started. Review cultural interests for every guest.');});
+$('reload').onclick=()=>perform(async()=>{render(await tool('state'));message('Current group loaded.');});
+$('searchSeed').onclick=()=>perform(()=>search('seed'));
+$('searchPlace').onclick=()=>perform(()=>search('candidate'));
+$('evaluate').onclick=()=>perform(async()=>{if(drafts.size)throw new Error('Save or discard edited facts first.');invalidate();message('Comparing the same shortlist for every guest…');const result=await tool('evaluate');$('evidence').textContent=JSON.stringify(result,null,2);$('proposal').replaceChildren();if(result.status!=='proposal'){$('proposal').textContent='No proposal: '+(result.reason||result.status);message('Resolve the missing evidence before proposing.');return;}
+ const chosen=result.result.selected;const c=state.candidates[chosen.id];$('proposal').append(node('h3',c.name));$('proposal').append(node('p','Lowest guest rank: '+chosen.minimum_proxy.toFixed(2)+' · Mean rank: '+chosen.mean_proxy.toFixed(2)));const base=result.result.mean_only_baseline;$('proposal').append(node('p','Mean-only comparison: '+state.candidates[base.id].name));$('proposal').append(node('p',result.result.limitation));if(result.tied_top_ids.length>1)$('proposal').append(node('p','Equal top rank: '+result.tied_top_ids.map(id=>state.candidates[id].name).join(', ')+'. The displayed first option is only a stable tie-break.'));$('proposal').append(node('strong','Confirm with the group. No booking has been made.'));message('Proposal ready for group review.');});
+(async()=>{try{const r=await fetch('/api/status');const s=await r.json();csrf=s.csrf;$('connection').textContent=s.configured?'Qloo configured · live validation pending':'Qloo unavailable · '+s.reason;}catch(e){message('The local server is unavailable.');}setBusy(false);})();
