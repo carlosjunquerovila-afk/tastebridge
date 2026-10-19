@@ -1,42 +1,49 @@
 # TasteBridge
 
-Group cultural decision lab by Carlosjv. Developed with AI assistance. MIT licensed.
+A group cultural decision lab by **Carlosjv**, developed with AI assistance. MIT licensed.
 
-## Status
-Synthetic offline prototype, not a completed Qloo submission. All venues, costs, facts and preferences are fictional. No live Qloo integration, model inference, real recommendations, bookings, verified group consent or revenue is claimed. API access was requested on 16 October 2026 and remains pending.
+## Current status (19 October 2026)
 
-## Run
-Requires Node.js 22+ for the tests and Python 3 for this optional local static server. No package installation is needed.
+This repository contains two distinct builds:
+
+| Build | Location | What it does | Limitation |
+| --- | --- | --- | --- |
+| Public static demo | [GitHub Pages](https://carlosjunquerovila-afk.github.io/tastebridge/) and root `index.html` | Explains and exercises the group decision policy with fictional venues and preferences. | Synthetic offline prototype; no Qloo requests, live recommendations or bookings. |
+| Backend candidate 0.2.2 | [`backend/`](backend/) | Local HTTP interface, explicit entity review, Qloo HTTPS transport, bounded function-tool workflow and deterministic group comparison. | No authenticated Qloo success, publicly hosted backend, judge-accessible live demo or independent benefit measurement has been verified. |
+
+The current Devpost project is a **draft**, not a submitted or winning entry. Do not interpret the static GitHub Pages demo as evidence that the backend is online. Qloo event access was requested and remains unverified in this repository.
+
+## Run and verify
+
+The static demo needs Node.js 22+ for its checks and Python 3 for an optional local server. It requires no package installation:
 
 ```sh
 node test.mjs
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-Open http://127.0.0.1:8000 in your browser. The application is browser-local and does not persist sessions or send form inputs to a backend. Optional Google Fonts requests expose ordinary network metadata to the font provider.
+Open `http://127.0.0.1:8000`. The static app stores no session on a backend and uses explicitly fictional examples. Optional Google Fonts requests expose ordinary network metadata to the font provider.
+
+For the separate local backend candidate, use Python 3.12+:
+
+```sh
+cd backend
+python3 -m unittest -q
+node test_ui.cjs
+python3 server.py
+```
+
+Open `http://127.0.0.1:8766` on the same machine. It binds to loopback and must not be publicly exposed in its current form. The code was checked on 19 October: 52 Python tests and 8 simulated-DOM controller checks passed. Provider responses in these tests are simulated; they are **not live Qloo validation**. See [backend/README.md](backend/README.md) for the current workflow, input limits and security boundaries.
 
 ## Decision policy
-Filter individual vetoes, budget and required step-free evidence before ranking by the lowest of three declared preference proxies, then mean, then locale-independent candidate ID. Unknown evidence holds an option for clarification. Mean-only comparison makes the trade-off visible. This policy does not establish real satisfaction or universal fairness.
 
-Confirmation applies only to the local test. Input changes clear it. JSON exports are explicitly synthetic, and invalid updates cannot export a stale result.
+The static demo filters individual vetoes, budget and required step-free evidence before ranking by the minimum of three declared preference proxies, then mean and stable candidate ID. The backend filters the same hard constraints, explicitly reviews cultural entities and compares within-query ordinal midranks on the same feasible shortlist for every guest. Neither policy proves satisfaction, universal fairness or a real benefit. Missing or stale facts cause clarification or abstention. Confirmation remains with the group; the application does not book or pay.
 
-## Validation
-26 internal checks pass, including one generated-case check with 200 deterministic synthetic candidate sets. Checks cover constraints, missing evidence, malformed values, sparse arrays, permutation stability and confirmation lifecycle. They are not external validation or live Qloo results. Desktop smoke tests on the public GitHub Pages demo verified the baseline comparison, individual veto, zero-budget abstention, missing-evidence clarification and confirmation invalidation. Mobile, export download and live integration QA remain pending.
+## Submission gates
 
-## Known gaps before submission
-- Live Qloo-backed agent workflow and explicit provenance.
-- Validation that affinity signals are comparable before group aggregation.
-- Independently sourced operational facts or clarifying questions.
-- Full end-to-end verification of the future live integration.
-- Real usefulness and commercial validation.
+- An individually attributable event credential, published free quota and expiry, and a redacted successful Qloo request-to-result trace.
+- End-to-end browser testing against the live backend and a functional demo accessible to judges for the judging period.
+- A coherent agent or function-tool path demonstrably using Qloo, plus a comparison that separates measured outcomes from the synthetic policy illustration.
+- Devpost fields, eligibility and any required legal acceptance completed by the entrant before final submission.
 
-See INTEGRATION_CONTRACT.md for acceptance requirements. A subscription concierge for independent accommodation hosts is a hypothesis, not a validated business.
-
-## Audit finding corrected
-Revision 2 allowed sparse JavaScript score arrays to bypass validation and produce NaN. Revision 3 materializes the array and abstains on missing evidence; a regression check reproduces the case. Missing score containers now clarify, while malformed containers and flags are rejected explicitly.
-
-## Public demo and connector progress
-
-https://carlosjunquerovila-afk.github.io/tastebridge/
-
-The demo is public and still synthetic. A server-only CLI search adapter is now included; it is not wired to the demo and has not made a successful live request. See CONNECTOR_STATUS.md for installation checks, nine mock tests and the missing credential blocker.
+Read [CONNECTOR_STATUS.md](CONNECTOR_STATUS.md) for technical provenance and [INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md) for the remaining verification criteria. The official [hackathon rules](https://qloo.devpost.com/rules) control the entry requirements.
