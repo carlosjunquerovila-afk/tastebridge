@@ -1,0 +1,18 @@
+{
+  "name": "tastebridge",
+  "description": "Local shared-activity workflow. Search public cultural entities, record explicit user-reviewed choices and practical facts, then compare a common shortlist. Never invent reviews, facts or vetoes. No bookings or payments. Unavailable or incomplete provider evidence must remain blocked.",
+  "transport": "POST /api/tool on the same trusted loopback machine; X-TasteBridge-Token from GET /api/status",
+  "parameters": {
+    "type": "object",
+    "required": ["action", "arguments"],
+    "additionalProperties": false,
+    "properties": {
+      "action": {"type":"string", "enum":["create","state","search","confirm_entity","candidate_facts","remove_entity","evaluate"]},
+      "arguments": {
+        "type":"object",
+        "description":"Use current session_id and revision after create. create: participants 2–6, budget, required_facts [] or [step_free]. search: role seed/candidate, public query, entity_type for seeds. confirm_entity: returned search_id/entity_id, participant for seeds, reviewed=true only after explicit review. candidate_facts: entity_id, cost_per_person, facts with step_free true/false/null, explicit guest vetoes, source_note, timezone-aware observed_at, reviewed=true. remove_entity: entity_id and participant for a seed, or entity_id only for a place. evaluate/state: current session context."
+      }
+    }
+  },
+  "limitations": ["Function-tool contract, not a model-provider integration or MCP server", "Explicit review input is recorded but reviewer identity is not authenticated", "State expires; public deployment is not supported", "Provider availability and real API validation are separate"]
+}
