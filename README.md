@@ -1,49 +1,51 @@
-# TasteBridge
+# TasteBridge — Find your common ground
 
-A group cultural decision lab by **Carlosjv**, developed with AI assistance. MIT licensed.
+A Qloo-powered group decision tool by **Carlosjv**.
 
-## Current status (19 October 2026)
+**Live demo:** https://tastebridge-carlosjv.zrm7tv2zmj.chatgpt.site
 
-This repository contains two distinct builds:
+## What it does
 
-| Build | Location | What it does | Limitation |
-| --- | --- | --- | --- |
-| Public static demo | [GitHub Pages](https://carlosjunquerovila-afk.github.io/tastebridge/) and root `index.html` | Explains and exercises the group decision policy with fictional venues and preferences. | Synthetic offline prototype; no Qloo requests, live recommendations or bookings. |
-| Backend candidate 0.2.2 | [`backend/`](backend/) | Local HTTP interface, explicit entity review, Qloo HTTPS transport, bounded function-tool workflow and deterministic group comparison. | No authenticated Qloo success, publicly hosted backend, judge-accessible live demo or independent benefit measurement has been verified. |
+A host reviews one cultural preference for each of 2–6 guests and a shortlist of 2–5 places. TasteBridge checks host-reported budgets, accessibility needs and vetoes before asking Qloo for each guest’s cultural affinity over the same eligible places. It compares within-query midranks, maximizing the lowest rank before the mean. Ties stay visible; the group makes the final decision.
 
-The current Devpost project is a **draft**, not a submitted or winning entry. Do not interpret the static GitHub Pages demo as evidence that the backend is online. Qloo event access was requested and remains unverified in this repository.
+Qloo provides the search and affinity evidence. Prices and accessibility facts are host-reported. Missing or constant evidence causes abstention rather than invented scores. This is a bounded deterministic decision tool, not a tested autonomous LLM agent, and ranks are not satisfaction probabilities.
 
-## Run and verify
+## Download and extract the complete live source
 
-The static demo needs Node.js 22+ for its checks and Python 3 for an optional local server. It requires no package installation:
+Download [`TasteBridge-0.3.2-source.zip`](TasteBridge-0.3.2-source.zip) from this repository and extract it before following the source paths below. The archive includes all tracked hosted source, assets, vendor notices, tests, and submission evidence. No credentials or installed dependencies are included.
 
 ```sh
-node test.mjs
-python3 -m http.server 8000 --bind 127.0.0.1
+unzip TasteBridge-0.3.2-source.zip
+cd hosted
+pnpm install --frozen-lockfile
+node test-policy.mjs
+pnpm build
 ```
 
-Open `http://127.0.0.1:8000`. The static app stores no session on a backend and uses explicitly fictional examples. Optional Google Fonts requests expose ordinary network metadata to the font provider.
+SHA-256: `8bb5a9f5a2d046595b932259f2fd1eb898f620cc8298a1e6e03fc2648b106a91`.
 
-For the separate local backend candidate, use Python 3.12+:
+## Source map (inside the archive)
 
-```sh
-cd backend
-python3 -m unittest -q
-node test_ui.cjs
-python3 server.py
-```
+- `hosted/`: exact source snapshot of the public Vinext/Workers demo, from hosted commit `6a47cbcd97239aa9da7864156d19046c13238310`.
+- `backend/`: earlier Python 0.2.2 local runtime and tests.
+- Root static files and `hosted/public/lab/`: earlier explicitly synthetic policy lab; not the live provider integration.
+- `submission/HOSTED_EVIDENCE_20261019.json`: redacted real hosted HTTP workflow evidence.
+- `submission/DEVPOST_STORY_20261019.md`: reviewed text prepared for the existing Devpost entry; this file is not proof of submission.
 
-Open `http://127.0.0.1:8766` on the same machine. It binds to loopback and must not be publicly exposed in its current form. The code was checked on 19 October: 52 Python tests and 8 simulated-DOM controller checks passed. Provider responses in these tests are simulated; they are **not live Qloo validation**. See [backend/README.md](backend/README.md) for the current workflow, input limits and security boundaries.
+## Run the hosted implementation
 
-## Decision policy
+Requires Node >=22.13 and pnpm. From `hosted/`, run `pnpm install --frozen-lockfile`, `node test-policy.mjs`, then `pnpm build` (the included Sites build integration is required). The hosting platform must provide a D1 binding named `DB`, apply `drizzle/0000_tan_spyke.sql`, and inject `QLOO_API_KEY` as a server-only secret. Use your own registered project ID when deploying a separate instance; never overwrite the maintainer’s deployment. Sites deployment uses its supplied build/package workflow. See `hosted/README.md` and the included scripts for details.
 
-The static demo filters individual vetoes, budget and required step-free evidence before ranking by the minimum of three declared preference proxies, then mean and stable candidate ID. The backend filters the same hard constraints, explicitly reviews cultural entities and compares within-query ordinal midranks on the same feasible shortlist for every guest. Neither policy proves satisfaction, universal fairness or a real benefit. Missing or stale facts cause clarification or abstention. Confirmation remains with the group; the application does not book or pay.
+No API key is included. The existing public demo can be used without installing anything or supplying credentials. A persistent 60-call application allowance and one-hour cache bound provider use; this is not a representation of Qloo’s quota. There is no automatic refill or retry.
 
-## Submission gates
+## Verified scope
 
-- An individually attributable event credential, published free quota and expiry, and a redacted successful Qloo request-to-result trace.
-- End-to-end browser testing against the live backend and a functional demo accessible to judges for the judging period.
-- A coherent agent or function-tool path demonstrably using Qloo, plus a comparison that separates measured outcomes from the synthetic policy illustration.
-- Devpost fields, eligibility and any required legal acceptance completed by the entrant before final submission.
+On 19 October 2026, a hosted HTTP test completed four real searches and two real Qloo Insights calls, producing an explicitly tied shortlist. Test preferences and prices were synthetic operator inputs; provider evidence was real. The public homepage, API metadata and a cached search were reachable without sign-in. Ten hosted policy checks and 52 Python regression tests passed. Browser visual QA and a comparative benchmark against LLM-only recommendations have not been completed.
 
-Read [CONNECTOR_STATUS.md](CONNECTOR_STATUS.md) for technical provenance and [INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md) for the remaining verification criteria. The official [hackathon rules](https://qloo.devpost.com/rules) control the entry requirements.
+## License
+
+MIT, see `LICENSE`. Retained dependencies and vendor files keep their respective license notices. No booking, payment, personal identity inference or autonomous paid model call is performed.
+
+## Recorded case and policy trade-off
+
+The demo now offers an explicitly dated replay of real Qloo evidence that makes no live API calls. Live queries remain capped. `hosted/benchmark-policy.mjs` enumerates 216 synthetic 3-guest/3-option ordinal profiles; max-min improves the worst rank in 27 cases compared with mean-only, at an average mean-rank sacrifice of 0.013889. This is not a user-satisfaction or LLM benchmark.

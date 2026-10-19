@@ -1,20 +1,16 @@
-# TasteBridge live integration acceptance contract
+# Integration contract — hosted revision
 
-Status (19 October 2026): `backend/` contains a bounded Qloo HTTPS adapter and local application, tested with synthetic provider fixtures. No authenticated Qloo response, event credential, public backend or judge-accessible live demo has been verified. The root static demo remains synthetic and must not be relabeled as Qloo-connected.
+The current hosted source is `hosted/`; `backend/` retains the earlier local Python implementation.
 
-1. Keep the event credential exclusively in a server-side secret. Never ship it in dist/, logs, browser requests, exports, screenshots or repository history.
-2. Use explicit guest-provided cultural likes, with pseudonymous session participant IDs. Resolve entities through the official Qloo interface and ask guests to review ambiguous matches. Do not infer sensitive attributes.
-3. Keep Qloo affinity provenance separate from operational facts. Each signal needs source entity, candidate entity, retrieval time and a documented interpretation. Do not assume scores from different requests are calibrated or comparable. Validate that assumption before applying max-min across guests.
-4. Keep independent venue evidence for price, accessibility and availability. Unknown required facts hold the option for clarification. A cultural affinity response cannot supply these facts implicitly.
-5. Agent workflow: clarify intent -> resolve reviewed entities -> retrieve bounded evidence -> validate candidates -> invoke deterministic decision tool -> explain trade-off -> request group confirmation. The backend implements a local function-tool path and deterministic decision policy; no embedded model, real Qloo result or end-to-end agent execution has been validated.
-6. Set explicit call/time limits. Auth failures, quota limits, timeouts and malformed responses must produce a visible blocked or clarification state. Never fall back silently to fictional fixtures in live mode.
-7. Test real success, authentication failure, rate limiting, unknown entity, incomplete operational evidence and no feasible candidate. Redact credentials from retained traces. Record fixture tests separately from live integration results.
-8. Evaluate Qloo contribution against a baseline on the same candidates and constraints. Record query and candidate selection procedure before comparison. Do not hand-pick only favorable cases or call synthetic utility guest satisfaction.
-9. Release only with a public open-source repository, licensed dependencies, a working externally accessible demo, and completed end-to-end checks. This public repository alone does not establish live functionality. A private Sites publication and the current synthetic GitHub Pages site are not a competition-ready live demo.
+1. Search only bounded public cultural titles/place names against the fixed official Qloo event origin. Show address and description for review; no silent place selection.
+2. Authenticate reviewed entity selections with server-side HMAC proofs that expire after one hour.
+3. Apply host-reviewed price, accessibility and veto constraints before cultural ranking. Facts expire after 24 hours.
+4. Query each guest over the identical feasible shortlist. Require complete finite and discriminating affinity evidence; otherwise abstain.
+5. Convert scores to within-query midranks. Maximize minimum guest rank, then mean. Display ties explicitly; do not label ranks as probabilities.
+6. Require group confirmation. Do not book, pay, infer identities or call a paid model API.
+7. Keep credentials server-only, reject redirects/non-2xx, cap response size at 2 MB and timeout at 15 seconds. Durable SQL permits at most 60 provider calls for this demo revision, with a one-hour cache and no automatic retries.
+8. Invalidate displayed proposals on edits and ignore evaluation responses from an older input revision.
 
-Official references to verify when implementing:
-- https://github.com/qloo/qloo-hackathon-kit
-- https://qloo.devpost.com/resources
-- https://qloo.devpost.com/rules
+The hosted HTTP path has real provider evidence. The synthetic decision-policy lab remains a separate historical teaching artifact. Browser visual QA and autonomous LLM-agent execution are not claimed.
 
-No endpoint schemas or live score normalization are assumed by this document.
+Source paths refer to the extracted `TasteBridge-0.3.2-source.zip` archive published at the repository root.
