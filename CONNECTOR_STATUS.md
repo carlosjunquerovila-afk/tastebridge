@@ -1,29 +1,26 @@
-# Qloo connector status — 16 October 2026
+# Qloo integration status — 19 October 2026
 
-Implemented: a trusted Node.js wrapper for the official CLI entity-search command. It is NOT an agent, ranking integration, HTTP service or deployed backend. The public browser demo remains synthetic.
+**Current evidence:** `backend/` contains a working loopback application and a direct HTTPS adapter that constructs bounded Qloo search and insights requests. It has **not** produced an authenticated Qloo response in the evidence available here. The public GitHub Pages build remains a separate fictional-data demo. The Devpost project remains a draft.
 
-## Verified
-- Official @qloo/qloo-harness 0.1.26 installed in an isolated development directory using npm with lifecycle scripts disabled.
-- Version command returned 0.1.26. Search help confirms --query, --json and --dry-run.
-- Nine mock subprocess tests passed: no-key behavior, argument isolation, fixed hackathon origin, call budget, bad input, response validation, credential echo protection, redacted errors, timeouts and missing binary.
-- The documented dry-run command was attempted without a key; the CLI returned AUTH_FAILED before producing a request. No successful live call or completed dry-run is claimed.
+## Implemented locally
 
-## Run the tests
-```sh
-node qloo-search.test.mjs
-```
+- `backend/qloo_http.py`: fixed `https://hackathon.api.qloo.com` origin; `/search` and `/v2/insights`; server-only `X-Api-Key`; no redirect, retry or synthetic fallback; timeout, output limit, error categories and SHA-256 response fingerprint. Keys are neither logged nor returned. Calls require both `QLOO_API_KEY` and an explicitly confirmed free event-access flag.
+- `backend/qloo_adapter.py`: validated public entity names, type and count; explicit review of search matches; bounded shortlist IDs; response shape and finite-affinity checks.
+- `backend/workflow.py`: 2–6 anonymous guests, at most three reviewed interests per guest, at most five reviewed places, facts with timestamps, hard constraints, equal feasible shortlist, within-query midranks, revision/cache controls and group confirmation. Practical facts are user-reported and not authenticated.
+- `backend/server.py`: local HTTP function tool and browser interface. It binds to loopback; its local token, Host and Origin checks are **not a public-hosting security assessment**.
 
-## Intended trusted-process use
-Install the official CLI version 0.1.26 or a separately reviewed compatible version; ensure qloo is on PATH. Read a real event credential from a server-side secret into createQlooSearch({apiKey: process.env.QLOO_API_KEY}). Never put a credential in source, a static bundle, logs or command-line arguments.
+## Reproduced checks
 
-The adapter uses execFile with shell disabled, a 15-second timeout, a 512 KiB output cap and three attempts per adapter instance by default. The instance must be shared at the intended scope: this is NOT a deployment-wide rate limiter. Failed requests also consume that budget. No automatic retry or fixture fallback is performed.
+On 19 October 2026, `python3 -m unittest -q` passed **52 tests**, and `node test_ui.cjs` passed **8 controller checks**. The Python tests exercise loopback HTTP and synthetic Qloo response fixtures, including failures and credential-redaction paths. The JavaScript test runs the real controller with a simulated DOM, not rendered-browser QA. No live request or independent outcome study was performed in these checks.
 
-Only pass reviewed cultural titles or concepts. No free-form guest biography, contact details, medical requirements or personal identifiers should enter this search path. The adapter does not constitute a general PII detector.
+The older root `qloo-search.mjs` and its nine simulated subprocess checks remain historical work. It is not the adapter used by the current backend. The official `@qloo/qloo-harness` package contract was inspected to cross-check route and parameter names, but the direct backend adapter has not been accepted as an organizer-verified event integration.
 
-All returned JSON objects are labeled unvalidated_evidence, require entity review, and are not ready for ranking. This intentionally does not invent the upstream result schema or treat an error-shaped JSON object as validated data. Validation of the real response, entity review, affinity retrieval, cross-guest comparability, server hosting, authentication and browser integration remain unfinished. Upstream failure classification is deliberately generic until the actual documented error contract is verified.
+## Release gates
 
-## References
-- https://github.com/qloo/qloo-hackathon-kit
-- https://github.com/qloo/qloo-hackathon-kit/blob/main/starter/cli-workflow/README.md
+1. Obtain and verify an individually attributable event credential and published free quota, rate limit and expiry. The requested access is still unconfirmed here. Do not paste any key into GitHub, Devpost, screenshots or chat.
+2. Use a server-side secret, record one bounded successful search and shortlisted affinity request, check the actual response schema and redact the trace. An HTTP 200 alone is insufficient.
+3. Run an end-to-end browser flow using the actual provider, including failed auth, rate limit, unknown entity, incomplete practical evidence, no feasible option and stale revision.
+4. Host the working backend and interface free for judges through the judging period, with an appropriate public access and security design. A loopback URL is not a public demo.
+5. Reconcile the Devpost text, source and demo links with the same tested version before the entrant finalizes the submission under the official rules.
 
-The key request remains pending as of the last mailbox check. Do not submit this as a completed Qloo integration.
+Official references: [rules](https://qloo.devpost.com/rules), [event access and limits](https://github.com/qloo/qloo-hackathon-kit/blob/main/docs/API_ACCESS.md), [submission guide](https://github.com/qloo/qloo-hackathon-kit/blob/main/docs/SUBMISSION.md).
