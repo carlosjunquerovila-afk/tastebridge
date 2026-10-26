@@ -1,0 +1,163 @@
+--- hosted/README.md
++++ hosted/README.md
+@@ -14,7 +14,7 @@
+ 
+ ## Development
+ 
+-Install dependencies using the supported Sites helper; run `node test-policy.mjs` for decision/constraint checks. Generate D1 migrations with `npm run db:generate`. Build through the Sites build helper. Both schema and generated SQL are versioned. GET `/api/taste` describes the bounded tool interface; POST accepts `search` and `evaluate`. Same-origin required. This is a deterministic agentic decision tool, not a claim that a deployed autonomous LLM agent has been tested.
++Install dependencies using the supported Sites helper; run `node test-policy.mjs` and `node test-api-local.mjs` for decision/constraint checks. Generate D1 migrations with `npm run db:generate`. Build through the Sites build helper. Both schema and generated SQL are versioned. GET `/api/taste` describes the bounded tool interface; POST accepts `search` and `evaluate`. Same-origin required. This is a deterministic agentic decision tool, not a claim that a deployed autonomous LLM agent has been tested.
+ 
+ ## Verification limits
+ 
+@@ -26,4 +26,6 @@
+ 
+ `node benchmark-policy.mjs` exhaustively enumerates 216 synthetic strict ordinal profiles for three guests and three options. Against a mean-only midrank baseline, max-min changes the choice in 27 cases (12.5%), improves the minimum in those 27, and leaves it equal in 189. Average minimum-rank gain is 0.0625, while average mean-rank sacrifice is 0.013889 (maximum 1/6). These are designed-policy properties on synthetic preferences, not a Qloo/LLM accuracy comparison or evidence of real user satisfaction. Results are at `/evidence/synthetic-policy-benchmark.json`.
+ 
+-POST request bodies are now bounded while streaming, before parsing, at 16,000 bytes. API metadata reports the remaining live allowance. The recorded replay is never substituted silently for a live query.
++POST request bodies are now bounded while streaming, before parsing, at 192,000 bytes. API metadata reports the remaining live allowance. The recorded replay is never substituted silently for a live query.
++
++Local audit correction: a constant first guest affinity now abstains immediately before additional provider requests. The API regression harness mocks fetch and D1 and does not validate the deployment.
+--- hosted/app/api/taste/route.ts
++++ hosted/app/api/taste/route.ts
+@@ -33,9 +33,11 @@
+  let remaining:number|null=null;try{const row=await (env as any).DB.prepare("SELECT used FROM qloo_meter WHERE id='event-v1'").first();remaining=Math.max(0,60-Number(row?.used||0));}catch{}
+  return Response.json({version:'0.3.2',mode:'Qloo live, bounded and cached',remainingLiveCalls:remaining,recordedExample:'/evidence/verified-case.json',actions:['search','evaluate'],maxGuests:6,maxCandidates:5,policy:'Within-shortlist midrank; maximize the minimum, then the mean; group confirms. No bookings.'},{headers});
+ }
++// 11 signed selections (up to 12 KB each), reviewed facts and UTF-8 metadata.
++// Keep a hard streaming ceiling while supporting the advertised 6 + 5 inputs.
+ async function boundedBody(req:Request){
+  const reader=req.body?.getReader();if(!reader)throw Error('JSON required');let size=0;const parts:Uint8Array[]=[];
+- for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>16000){await reader.cancel();throw Error('Request too large');}parts.push(value);}
++ for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>192000){await reader.cancel();throw Error('Request too large');}parts.push(value);}
+  const bytes=new Uint8Array(size);let offset=0;for(const part of parts){bytes.set(part,offset);offset+=part.length;}return new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+ }
+ export async function POST(req:Request){
+@@ -63,6 +65,9 @@
+    const entities=r.data.results?.entities;if(!Array.isArray(entities)||entities.length>10)throw Error('Invalid affinity response');const scores:Record<string,number>={};
+    for(const e of entities){const id=e.entity_id?.toLowerCase(),score=e.affinity??e.query?.affinity;if(!ids.includes(id)||id in scores||typeof score!=='number'||!Number.isFinite(score))throw Error('Invalid affinity evidence');scores[id]=score;}
+    const missing=ids.filter(id=>!(id in scores));if(missing.length)return Response.json({status:'needs_information',message:'Qloo has incomplete taste evidence for this shortlist. Replace the listed place or choose another cultural preference.',missing:eligible.filter(c=>missing.includes(c.entity.id)).map(c=>c.entity.name),excluded},{headers});
++   // Abstain as soon as a guest has no discriminating evidence; do not spend
++   // the remaining guests' allowance on an already impossible proposal.
++   rankGroup([scores],ids);
+    matrix.push(scores);evidence.push({seed:seed.name,affinities:scores,at:r.at,sha256:r.sha256,cached:r.cached});
+   }
+   const ranking=rankGroup(matrix,ids).map(r=>({...r,entity:eligible.find(c=>c.entity.id===r.id).entity,price:eligible.find(c=>c.entity.id===r.id).price}));
+--- hosted/app/globals.css
++++ hosted/app/globals.css
+@@ -1,3 +1,6 @@
+ @import 'tailwindcss';
+ :root{font-family:Arial,Helvetica,sans-serif;color:#172824;background:#fafbf8;font-synthesis:none}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0}button,input,select{font:inherit}a{color:inherit}header{height:88px;display:flex;justify-content:space-between;align-items:center;max-width:1240px;margin:auto;padding:0 36px;border-bottom:1px solid #dde4dc}.brand{font-size:25px;font-weight:750;text-decoration:none;letter-spacing:-1px}.brand span{color:#df9e64;margin-left:5px;font-size:14px}nav{display:flex;gap:28px;font-size:13px}nav a{text-decoration:none}main{max-width:1168px;margin:auto}.hero{padding:95px 12px 85px;max-width:900px}.eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;color:#62776a}h1{font-size:clamp(56px,7.5vw,96px);font-weight:600;line-height:1.03;letter-spacing:-5px;margin:26px 0}h1 span{color:#75977f}.hero>p{font-size:18px;line-height:1.65;max-width:560px;color:#5b6b62}.cta{display:inline-flex;gap:55px;text-decoration:none;background:#1e4436;color:#fff;padding:19px 24px;border-radius:7px;margin:28px 0}.hero-meta{display:flex;gap:24px;font-size:11px;color:#6a7c6e}.hero-meta span:before{content:'·';margin-right:9px}.workspace{background:white;border:1px solid #e0e6dd;border-radius:20px;padding:44px;box-shadow:0 15px 70px #183d2910;scroll-margin-top:24px}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}h2{font-size:34px;letter-spacing:-1px;font-weight:600;margin:10px 0 18px}h3{font-size:20px;font-weight:600;margin:0 0 8px}h4{font-size:16px;font-weight:600;margin:0 0 8px}p{line-height:1.6}.muted,.small,small{color:#6a776f}.small{font-size:12px;line-height:1.7}.badge{border:1px solid #d9e7da;border-radius:20px;padding:8px 12px;color:#3b6c4d;font-size:11px;white-space:nowrap}.step-title{display:flex;gap:20px;margin:44px 0 23px}.step-title>b{color:#7d9b87;border:1px solid #dce6dd;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;font-size:12px;flex-shrink:0}.step-title p{font-size:13px;color:#69776c;margin:0}.guests{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}.card{border:1px solid #e1e7de;padding:22px;border-radius:12px;background:#fcfdfb}.card-head{display:flex;justify-content:space-between;gap:15px}.card-head p{font-size:12px;color:#68766d;margin:0 0 20px}button{cursor:pointer;background:#214735;color:white;border:1px solid #214735;padding:10px 15px;border-radius:6px;font-size:12px;white-space:nowrap}button:disabled{cursor:wait;opacity:.5}.secondary{background:white;color:#294c38;border:1px solid #cfdbce}.text-button{border:0;background:none;color:#697c6b;padding:0;height:24px;text-decoration:underline;font-size:11px}.primary{font-size:15px;padding:18px 25px}.search-row{display:flex;gap:7px;flex-wrap:wrap}input,select{border:1px solid #ced8cd;background:white;border-radius:5px;padding:11px;color:#253d2c;max-width:100%;min-width:0;font-size:13px}input:focus,select:focus,button:focus-visible{outline:2px solid #7ca886;outline-offset:3px}.search-row input{flex:1;min-width:120px}.search-row select{max-width:100px}.match{border-top:1px solid #e1e6dc;margin-top:18px;padding-top:16px;display:flex;flex-direction:column;gap:12px}.match p{font-size:12px;margin:3px 0}.match small{font-size:11px;display:block}.id{word-break:break-all;margin:8px 0}.match button{align-self:flex-start}.chosen{display:flex;flex-direction:column;gap:12px}.chosen span{font-size:10px;color:#5c8664}.chosen .text-button{align-self:flex-start}.constraints{display:flex;align-items:center;gap:28px;background:#f0f5ed;padding:20px;margin:25px 0;border-radius:10px}label{font-size:12px;display:flex;flex-direction:column;gap:8px}.check{display:flex;flex-direction:row;align-items:center;gap:9px;font-size:12px;margin:14px 0}.check input{width:15px;height:15px;accent-color:#2d6343;flex-shrink:0}.venue{margin:15px 0}.fact-grid{display:grid;grid-template-columns:1fr 1fr 2fr;gap:14px}.result{margin-top:30px;background:#f3f7ef;padding:30px;border-radius:14px}.rank{display:flex;gap:20px;align-items:flex-start;border-top:1px solid #d7e0d2;padding:22px 0}.rank>b{font-size:13px;color:#789879}.rank>div{flex:1}.rank p{font-size:12px;color:#6c786b;margin:4px 0}.rank>strong{font-size:18px}.rank>strong small{display:block;font-size:9px;font-weight:400}.rank-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.rank-tags span{font-size:10px;background:white;padding:6px 9px;border-radius:3px}.error{color:#944a2d;background:#fff2eb;padding:12px;border-radius:6px;font-size:13px}.success{color:#286345}details{font-size:12px;margin-top:25px}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10px;max-height:350px;overflow:auto;background:white;padding:15px}.method{padding:80px 12px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:45px;margin:35px 0}.three b{font-size:11px;color:#779077}.three h3{margin-top:18px}.three p{font-size:13px;color:#68766d}footer{max-width:1168px;margin:auto;padding:30px 12px;border-top:1px solid #dde4dc;display:flex;justify-content:space-between;font-size:11px;color:#6f7f72}@media(max-width:760px){header{padding:0 20px;height:72px}nav{gap:15px}nav a:first-child{display:none}main{padding:0 16px}.hero{padding:55px 4px}h1{letter-spacing:-3px}.hero-meta{flex-wrap:wrap;gap:8px 16px}.workspace{padding:23px 18px}.section-heading{align-items:flex-start;flex-direction:column}h2{font-size:27px}.guests,.three{grid-template-columns:1fr}.fact-grid{grid-template-columns:1fr 1fr}.fact-grid>label:last-child{grid-column:1/-1}.constraints{flex-direction:column;align-items:stretch;gap:8px}.method{padding:55px 4px}.three{gap:20px}.result{padding:20px 15px}.rank{gap:12px}footer{padding:25px 20px;gap:20px}}
+ .example-link{display:block;font-size:12px;color:#4d7057;margin:0 0 28px;text-underline-offset:4px}.recorded-case{border:1px solid #d9e2d4;border-radius:16px;background:#f0f5ec;padding:30px 36px;margin:0 0 32px;scroll-margin-top:24px}.recorded-case h2{font-size:26px}.recorded-case>p{font-size:14px;color:#5c6f5e;max-width:740px}.case-label{padding:12px 15px;border-left:3px solid #a5b899;background:#fff;font-size:12px;margin:22px 0}.recorded-case .primary{margin-top:20px}.recorded-case label{max-width:550px}@media(max-width:760px){.recorded-case{padding:24px 18px}.recorded-case h2{font-size:24px}}
++
++/* Keep long translated action labels inside narrow screens. */
++.primary{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+--- hosted/lib/taste.ts
++++ hosted/lib/taste.ts
+@@ -1,8 +1,11 @@
+ export function rankGroup(matrix: Record<string,number>[], ids:string[]) {
+  if(matrix.some(m=>ids.some(id=>!Number.isFinite(m[id])))) throw Error('Incomplete affinity evidence');
+  if(matrix.some(m=>new Set(ids.map(id=>m[id])).size<2)) throw Error('No discriminating taste evidence. Try a different shortlist.');
+- const ranks=matrix.map(m=>Object.fromEntries(ids.map(id=>[id,(ids.filter(j=>m[j]<m[id]).length+.5*(ids.filter(j=>m[j]===m[id]).length-1))/(ids.length-1)])));
+- return ids.map(id=>({id,ranks:ranks.map(r=>r[id]),minimum:Math.min(...ranks.map(r=>r[id])),mean:ranks.reduce((s,r)=>s+r[id],0)/ranks.length})).sort((a,b)=>b.minimum-a.minimum||b.mean-a.mean||a.id.localeCompare(b.id));
++ // Count half-rank units as integers, then normalize once. Summing rounded
++ // thirds/sixths can break exact ties and make the decision depend on guest order.
++ const units=matrix.map(m=>Object.fromEntries(ids.map(id=>[id,2*ids.filter(j=>m[j]<m[id]).length+ids.filter(j=>m[j]===m[id]).length-1])));
++ const denominator=2*(ids.length-1);
++ return ids.map(id=>({id,ranks:units.map(r=>r[id]/denominator),minimum:Math.min(...units.map(r=>r[id]))/denominator,mean:units.reduce((s,r)=>s+r[id],0)/(units.length*denominator)})).sort((a,b)=>b.minimum-a.minimum||b.mean-a.mean||a.id.localeCompare(b.id));
+ }
+ export function feasible(c:any,budget:number,access:boolean) {
+  if(c.veto===true)return 'Group veto';
+--- /dev/null
++++ hosted/test-api-local.mjs
+@@ -0,0 +1,26 @@
++// Local route integration; no credentials, network or Cloudflare resources.
++import assert from 'node:assert/strict';
++import {readFile} from 'node:fs/promises';
++import {stripTypeScriptTypes} from 'node:module';
++const origin='https://local.test';let calls=0,mode='search',counter=0;
++const db={prepare(sql){return {bind(){return this},async first(){return sql.includes('qloo_cache')?null:{used:1}},async run(){return {success:true}}}}};
++globalThis.__tasteEnv={DB:db,QLOO_API_KEY:'local-fixture-key-not-a-secret'};
++globalThis.fetch=async()=>{calls++;return Response.json(mode==='search'?{results:[{entity_id:`00000000-0000-4000-8000-${String(++counter).padStart(12,'0')}`,name:'N'.repeat(500),properties:{address:'A'.repeat(500),description:'D'.repeat(500)}}]}:{results:{entities:places.map((p,i)=>({entity_id:p.entity.id,affinity:mode==='constant'?1:(calls%2?i+1:places.length-i)}))}})};
++let source=await readFile(new URL('./app/api/taste/route.ts',import.meta.url),'utf8');
++source=source.replace("import {env} from 'cloudflare:workers';",'const env=globalThis.__tasteEnv;').replace("'../../../lib/taste'",JSON.stringify(new URL('./lib/taste.ts',import.meta.url).href));
++const {POST}=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64'));
++const post=body=>POST(new Request(origin+'/api/taste',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}));
++const picks=[];for(let i=0;i<11;i++){const r=await post({action:'search',query:'fixture '+i,type:i<6?'movie':'place'});assert.equal(r.status,200);picks.push((await r.json()).matches[0]);}
++const places=picks.slice(6).map(p=>({...p,price:10,source:'Host reviewed',stepFree:true,veto:false,reviewed:true,observed:Date.now()}));
++const request={action:'evaluate',guests:picks.slice(0,6).map(p=>({proof:p.proof,reviewed:true})),candidates:places,budget:20,access:false,reviewed:true};
++assert.ok(Buffer.byteLength(JSON.stringify(request))>16000);
++mode='constant';calls=0;
++const response=await post(request);const body=await response.json();
++assert.match(body.error,/No discriminating/,'Supported 6-guest/5-place request must reach evidence validation');
++assert.equal(calls,1,'Constant first guest evidence must stop before spending more calls');
++request.guests=request.guests.slice(0,2);request.candidates=request.candidates.slice(0,2);places.splice(2);calls=0;
++const short=await (await post(request)).json();assert.match(short.error,/No discriminating/);assert.equal(calls,1);
++const oversized=await (await post({action:'search',query:'x'.repeat(200000),type:'movie'})).json();assert.equal(oversized.error,'Request too large');assert.equal(calls,1);
++mode='varying';calls=0;const validResponse=await post(request);assert.equal(validResponse.status,200);const valid=await validResponse.json();assert.equal(valid.status,'proposal');assert.equal(valid.tied.length,2);assert.equal(calls,2);
++const foreign=await POST(new Request(origin+'/api/taste',{method:'POST',headers:{origin:'https://foreign.test','content-type':'application/json'},body:JSON.stringify(request)}));assert.equal(foreign.status,403);assert.equal(calls,2);
++console.log('Local API regressions passed: supported maximum request, early abstention, oversized input; fetch mocked.');
+--- /dev/null
++++ hosted/test-rank-stability.mjs
+@@ -0,0 +1,62 @@
++import assert from 'node:assert/strict';
++import {test} from 'node:test';
++import {readFile} from 'node:fs/promises';
++// The optional path makes the same assertions reproducible against an archived
++// baseline; normal test runs always use the current production implementation.
++const {rankGroup}=await import(process.env.TASTEBRIDGE_RANK_SOURCE||'./lib/taste.ts');
++
++const ids=['a','b','c','d'];
++const rows=profiles=>profiles.map(p=>Object.fromEntries(ids.map((id,i)=>[id,p[i]])));
++const counterexample=rows([[0,1,2,3],[0,1,2,3],[0,2,1,3],[3,2,1,0]]);
++const tied=ranking=>ranking.filter(r=>r.minimum===ranking[0].minimum&&r.mean===ranking[0].mean).map(r=>r.id);
++function* permutations(values){
++ if(!values.length){yield [];return;}
++ for(let i=0;i<values.length;i++)for(const rest of permutations(values.filter((_,j)=>i!==j)))yield [values[i],...rest];
++}
++
++test('an exact mathematical tie must not become a unique recommendation',()=>{
++ const ranking=rankGroup(counterexample,ids);
++ assert.deepEqual(tied(ranking),['b','c']);
++ assert.equal(ranking[0].mean,.5);
++ assert.equal(ranking[1].mean,.5);
++});
++
++test('every guest order preserves the entire decision in the regression case',()=>{
++ const expected=rankGroup(counterexample,ids).map(({ranks,...decision})=>decision);
++ for(const order of permutations(counterexample)){
++  assert.deepEqual(rankGroup(order,ids).map(({ranks,...decision})=>decision),expected);
++ }
++});
++
++test('every candidate order preserves the tied shortlist',()=>{
++ for(const order of permutations(ids))assert.deepEqual(tied(rankGroup(counterexample,order)),['b','c']);
++});
++
++test('the recorded Qloo replay still exposes both tied places without a provider call',async()=>{
++ const recorded=JSON.parse(await readFile(new URL('./lib/verified-case.json',import.meta.url),'utf8'));
++ const options=recorded.places.map(p=>p.id).sort();
++ assert.deepEqual(tied(rankGroup(recorded.guests.map(g=>g.affinities),options)),options);
++});
++
++test('deterministic profiles with ties match an integer rank oracle for 2–6 guests and 2–5 places',()=>{
++ let state=20261026;
++ const rand=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state;};
++ for(let count=2;count<=5;count++)for(let guests=2;guests<=6;guests++)for(let sample=0;sample<250;sample++){
++  const options=Array.from({length:count},(_,i)=>String.fromCharCode(97+i));
++  const matrix=Array.from({length:guests},()=>{
++   const values=options.map(()=>rand()%7);
++   if(new Set(values).size===1)values[0]++;
++   return Object.fromEntries(options.map((id,i)=>[id,values[i]]));
++  });
++  // Count pairwise wins (2 units) and ties (1 unit), excluding self.
++  // Compare these exact integers before any normalization.
++  const expected=options.map(id=>{
++   const units=matrix.map(m=>options.reduce((sum,other)=>sum+(other===id?0:m[id]>m[other]?2:m[id]===m[other]?1:0),0));
++   return {id,min:Math.min(...units),sum:units.reduce((a,b)=>a+b,0)};
++  }).sort((a,b)=>b.min-a.min||b.sum-a.sum||a.id.localeCompare(b.id));
++  const actual=rankGroup(matrix,options);
++  assert.deepEqual(actual.map(r=>r.id),expected.map(r=>r.id));
++  assert.deepEqual(tied(actual),expected.filter(r=>r.min===expected[0].min&&r.sum===expected[0].sum).map(r=>r.id));
++  assert.deepEqual(actual.map(({ranks,...decision})=>decision),rankGroup([...matrix].reverse(),options).map(({ranks,...decision})=>decision));
++ }
++});
