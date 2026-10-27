@@ -1,99 +1,76 @@
 # TasteBridge — Find your common ground
 
-A Qloo-powered group decision tool by **Carlosjv**.
+A Qloo-powered group decision tool by **Carlosjv**. MIT licensed.
 
-**Live demo:** https://tastebridge-carlosjv.zrm7tv2zmj.chatgpt.site
+**Working demo:** https://tastebridge-carlosjv.zrm7tv2zmj.chatgpt.site/
 
-## What it does
+## What the tool does
 
-A host reviews one cultural preference for each of 2–6 guests and a shortlist of 2–5 places. TasteBridge checks host-reported budgets, accessibility needs and vetoes before asking Qloo for each guest’s cultural affinity over the same eligible places. It compares within-query midranks, maximizing the lowest rank before the mean. Ties stay visible; the group makes the final decision.
+One host reviews a public cultural preference for each of 2–6 guests and 2–5 places in the same area. Budget, host-reported accessibility facts and group vetoes are applied first. Qloo then supplies taste evidence for each guest over the same feasible shortlist. Within-query midranks protect the lowest guest rank, with the mean used to break ties. Tied leaders stay visible. The group makes the final choice; the app makes no booking.
 
-Qloo provides the search and affinity evidence. Prices and accessibility facts are host-reported. Missing or constant evidence causes abstention rather than invented scores. This is a bounded deterministic decision tool, not a tested autonomous LLM agent, and ranks are not satisfaction probabilities.
+Qloo affinities are not probabilities of satisfaction. Prices and accessibility are host-reported, not independently verified. Missing or constant evidence causes abstention. This is a bounded deterministic decision tool; no deployed autonomous LLM agent or LLM superiority benchmark is claimed.
 
-## Reproduce the deployed source from the historical archive
+## Reproduce the current hosted source — version 13
 
-The existing [`TasteBridge-0.3.2-source.zip`](TasteBridge-0.3.2-source.zip) plus [`hosted-v9.patch`](hosted-v9.patch) reconstructs all **137 tracked hosted source files** at deployed canonical commit `b9a5087699f6d84f7723eb88347c43eacf5f8819` (site version 9). The patch changes six files, including the two new test files. It is a complete source update; it does not require a new ZIP. The historical archive remains unchanged.
+This delivery includes a **self-contained full source patch**, [`hosted-v13.patch`](hosted-v13.patch), and the 144-file checksum inventory in [`SOURCE_SNAPSHOT_V13.json`](SOURCE_SNAPSHOT_V13.json). It reconstructs canonical hosted commit `3e7df4e7ea960eb2208ed5d5c2ec9f432c4edca1`, deployed as site version 13 on 27 October 2026. The historical ZIP and v9 patch are retained for history but are not needed for this reconstruction.
 
-Download or clone this repository so the ZIP, patch and [`SOURCE_SNAPSHOT_20261026.json`](SOURCE_SNAPSHOT_20261026.json) are in one directory. The following commands verify both input hashes, extract into a new directory, check and apply the patch with Git, then verify the complete hosted file set against the canonical SHA-256 manifest. Use Python 3, Git and Node 24.
+Use Python 3 and Git. From a clone or download of this repository:
 
 ```sh
-git clone https://github.com/carlosjunquerovila-afk/tastebridge.git
-cd tastebridge
-python3 - <<'PYTHON'
-from pathlib import Path
-import hashlib, json, subprocess, zipfile
+python3 reproduce_hosted_v13.py
+```
 
-manifest = json.loads(Path("SOURCE_SNAPSHOT_20261026.json").read_text())
-for name, expected in [(manifest["base_archive"], manifest["base_archive_sha256"]),
-                       (manifest["patch"], manifest["patch_sha256"])]:
-    assert hashlib.sha256(Path(name).read_bytes()).hexdigest() == expected, name
-root = Path("reproduced-v9")
-if root.exists():
-    raise SystemExit("reproduced-v9 already exists; use a fresh directory")
-root.mkdir()
-with zipfile.ZipFile(manifest["base_archive"]) as archive:
-    for info in archive.infolist():
-        relative = Path(info.filename)
-        assert not relative.is_absolute() and ".." not in relative.parts
-        target = Path(archive.extract(info, root))
-        mode = (info.external_attr >> 16) & 0o777
-        if mode:
-            target.chmod(mode)
-patch = str(Path(manifest["patch"]).resolve())
-subprocess.run(["git", "apply", "--no-index", "-p0", "--check", patch],
-               cwd=root, check=True)
-subprocess.run(["git", "apply", "--no-index", "-p0", patch],
-               cwd=root, check=True)
-hosted = root / "hosted"
-actual = {p.relative_to(hosted).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-          for p in hosted.rglob("*") if p.is_file()}
-assert actual == manifest["source_file_hashes"], "Hosted file set or hashes differ"
-print("Verified", len(actual), "hosted files against the canonical v9 manifest")
-PYTHON
-cd reproduced-v9/hosted
+The helper creates a new `reproduced-v13/hosted/` directory. It checks the patch's SHA-256 and size before applying it, verifies the complete reconstructed file inventory, and regenerates the two public source-distribution artifacts. It verifies the resulting ZIP against the deployed archive checksum. An existing destination is refused. The helper creates only an isolated local Git repository; it has no remote and makes no network, provider or payment calls. Run `python3 reproduce_hosted_v13.py --output PATH` to select another new destination.
+
+Source patch SHA-256: `bf2e3b407b1dc9909648d9660b10fb79bc1e0635a5aa87a0b5cb39302bb17fb0`.
+
+Generated source ZIP SHA-256: `2c8b9f3230a4a50cc89d2e445b73dac2ace7b65255cbbf7605464085d6168265`.
+
+Hashes establish equality of bytes, not independent authenticity or security. The snapshot includes application code, assets, dependency locks, tests, license notices and build scripts. It excludes installed dependencies and runtime secrets/data. Dated notes inside the hosted README record the conditions when those releases were authored; this root README defines the v13 source delivery.
+
+## Run and test
+
+Use Node 24 and the pinned package manager in `hosted/package.json`. From `reproduced-v13/hosted/`, these decision and route checks require no API key and make no provider calls:
+
+```sh
 node test-policy.mjs
 node test-rank-stability.mjs
+node test-recovery.mjs
 node test-api-local.mjs
+node test-search-revision.mjs
+node test-security-validation.mjs
+```
+
+Install the locked dependencies to run the guest-identity harness or build:
+
+```sh
 pnpm install --frozen-lockfile
+node test-guest-identity.mjs
 pnpm build
 ```
 
-Historical ZIP SHA-256: `8bb5a9f5a2d046595b932259f2fd1eb898f620cc8298a1e6e03fc2648b106a91`.
+The included Sites/Vinext integration is required. Hosting requires a D1 binding named `DB`, the migration `drizzle/0000_tan_spyke.sql`, and an existing authorized `QLOO_API_KEY` injected as a server-only secret. Use your own registered project identity for a separate deployment; do not overwrite the maintainer's site. Deployment uses the supported Sites build/package workflow. No credentials are included in source.
 
-Patch SHA-256: `048564190e41ec309d141dc4c237b9070f5ac4b47796631972ccbf1c6897aa02`.
+The public demo needs no visitor key. Its global durable allowance is 60 provider calls, with a one-hour cache and no automatic refill or retry. This is an application limit, not Qloo's provider quota. The explicitly dated recorded example works without new provider calls and is never substituted silently for live evidence.
 
-The three direct tests require no installed dependencies, API key, network or provider calls. A full application build additionally requires the locked dependencies and supported Sites build integration. The manifest hashes verify source bytes; they do not replace review or an independent trust anchor.
+## Verify the demonstrated behavior
 
-## Source map (after reconstruction)
+- Open the recorded example: two test profiles disagree and the policy returns a tie. Applying a veto leaves too few eligible places and produces recovery guidance.
+- For the v13 regression, add a third guest, type Arrival / Spirited Away / The Matrix without searching, then remove the first guest. The remaining fields retain Spirited Away / The Matrix. A newly added guest starts empty.
+- Unknown facts, over-budget options, accessibility conflicts and vetoes remain blockers; the recovery plan preserves the entered constraints.
 
-- `hosted/`: exact source snapshot of the public Vinext/Workers demo, from hosted commit `b9a5087699f6d84f7723eb88347c43eacf5f8819`.
-- `hosted/public/lab/`: the earlier explicitly synthetic policy lab; not the live provider integration.
-- The repository root and its `backend/` directory, outside this ZIP, preserve the earlier static lab and Python 0.2.2 local runtime.
-- `submission/HOSTED_EVIDENCE_20261019.json`: redacted real hosted HTTP workflow evidence.
-- `submission/DEVPOST_STORY_20261019.md`: reviewed text prepared for the existing Devpost entry; this file is not proof of submission.
+The guest identity guard passes 2/6 expectations on v12 and 6/6 on v13; the corrected case was also checked in the production browser. Existing policy, recovery, rank and mocked route checks pass. The tests use synthetic inputs and mocks where documented. No new Qloo request was needed for the v13 repair.
 
-## Run the hosted implementation
+Real provider evidence was recorded on 19 October: four hosted searches and two Insights calls produced an explicitly tied shortlist. Test preferences and prices were operator fixtures; the provider evidence was real. The synthetic policy benchmark covers 216 ordinal profiles: max-min changes 27 decisions versus mean-only and improves the minimum rank in those cases. Neither result measures real-user satisfaction or proves an award-winning outcome.
 
-Use Node 24 (verified with 24.22.1) and pnpm. The project engine minimum is Node 22.13; older Node 22 builds may require experimental TypeScript stripping for the direct tests. From `reproduced-v9/hosted/`, run the commands above (the included Sites build integration is required). The hosting platform must provide a D1 binding named `DB`, apply `drizzle/0000_tan_spyke.sql`, and inject `QLOO_API_KEY` as a server-only secret. Use your own registered project ID when deploying a separate instance; never overwrite the maintainer’s deployment. Sites deployment uses its supplied build/package workflow. See `hosted/README.md` and the included scripts for details.
+## Source and history
 
-No API key is included. The existing public demo can be used without installing anything or supplying credentials. A persistent 60-call application allowance and one-hour cache bound provider use; this is not a representation of Qloo’s quota. There is no automatic refill or retry.
+- Reconstructed `hosted/`: the current Vinext/Workers application and its tests.
+- `hosted/public/lab/`: the earlier explicitly synthetic policy lab.
+- Repository root and `backend/`: earlier static lab and Python runtime, retained as history.
+- `TasteBridge-0.3.2-source.zip`, `hosted-v9.patch` and `SOURCE_SNAPSHOT_20261026.json`: historical v9 reconstruction; not needed for v13.
+- `submission/HOSTED_EVIDENCE_20261019.json`: redacted historical hosted workflow evidence, if present in the existing repository history.
 
-## Verified scope
+## License and limitations
 
-On 19 October 2026, a hosted HTTP test completed four real searches and two real Qloo Insights calls, producing an explicitly tied shortlist. Test preferences and prices were synthetic operator inputs; provider evidence was real. The public homepage, API metadata and a cached search were reachable without sign-in. Ten hosted policy checks and 52 Python regression tests passed. Subsequent recorded-case browser checks were completed on 26 October. At a 390-pixel mobile viewport, the translated replay button now fits within the 375-pixel document width (305-pixel button, right edge 340); no horizontal document overflow was observed. Recorded replay also returned an honest tie and abstained when a veto left only one option. A comparative benchmark against LLM-only recommendations has not been completed.
-
-## License
-
-MIT, see `LICENSE`. Retained dependencies and vendor files keep their respective license notices. No booking, payment, personal identity inference or autonomous paid model call is performed.
-
-## Recorded case and policy trade-off
-
-The demo now offers an explicitly dated replay of real Qloo evidence that makes no live API calls. Live queries remain capped. `hosted/benchmark-policy.mjs` enumerates 216 synthetic 3-guest/3-option ordinal profiles; max-min improves the worst rank in 27 cases compared with mean-only, at an average mean-rank sacrifice of 0.013889. This is not a user-satisfaction or LLM benchmark.
-
-## Source synchronization — 26 October 2026
-
-The historical ZIP plus the patch reconstructs all tracked hosted source files at canonical commit `b9a5087699f6d84f7723eb88347c43eacf5f8819`, deployed as site version 9. `SOURCE_SNAPSHOT_20261026.json` records the base archive, patch and per-file hashes. The dated statements in the archived hosted README describe the work at that time; this section records the latest source scope.
-
-The update includes the 192,000-byte streaming request limit and immediate abstention when one guest has constant affinity evidence; it does not reset the provider allowance. It also replaces floating-point accumulation with integer half-rank units before normalization, so exact ties and guest-order invariance are preserved, and wraps long action labels on narrow screens.
-
-The direct offline test commands cover 10 prior decision/constraint checks, five rank regression/invariance tests (including 5,000 deterministic mixed-tie profiles against an integer oracle), and route regressions with fetch and D1 mocked. They make no provider calls and require no API key. The coordinator verified the post-fix 390-pixel mobile layout and the recorded tie/veto paths in the connected browser on 26 October; no new provider request was made. These are software-correctness checks, not measured customer impact or proof of competition superiority.
+MIT, see `LICENSE`; retained third-party components preserve their notices. The tool does not infer identities, make reservations or perform payments. Provider coverage and the finite live allowance can limit live operation. No customer outcome, prize, competition ranking or general AI superiority is claimed. Source publication is separate from a Devpost submission receipt.
